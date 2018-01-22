@@ -333,13 +333,14 @@ YYEncodingType YYEncodingGetType(const char *typeEncoding) {
     static dispatch_once_t onceToken;
     static dispatch_semaphore_t lock;
     dispatch_once(&onceToken, ^{
-        classCache = CFDictionaryCreateMutable(CFAllocatorGetDefault(), 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-        metaCache = CFDictionaryCreateMutable(CFAllocatorGetDefault(), 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-        lock = dispatch_semaphore_create(1);
+        classCache = CFDictionaryCreateMutable(CFAllocatorGetDefault(), 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks); // 获取缓存中本类的缓存
+        metaCache = CFDictionaryCreateMutable(CFAllocatorGetDefault(), 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks); // 获取缓存中本类的元类的缓存
+        lock = dispatch_semaphore_create(1); // 加锁，同时只允许一条线程执行
     });
-    dispatch_semaphore_wait(lock, DISPATCH_TIME_FOREVER);
+    dispatch_semaphore_wait(lock, DISPATCH_TIME_FOREVER); // 信号量计数减一，不允许其他线程进入
+    // 从类或者元类中获取缓存中与cls对应的YYClassInfo对象
     YYClassInfo *info = CFDictionaryGetValue(class_isMetaClass(cls) ? metaCache : classCache, (__bridge const void *)(cls));
-    if (info && info->_needUpdate) {
+    if (info && info->_needUpdate) { // 如果info不存在或者需要更新class中的信息
         [info _update];
     }
     dispatch_semaphore_signal(lock);

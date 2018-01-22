@@ -476,7 +476,7 @@ static force_inline id YYValueForMultiKeys(__unsafe_unretained NSDictionary *dic
 
 @implementation _YYModelMeta
 - (instancetype)initWithClass:(Class)cls {
-    YYClassInfo *classInfo = [YYClassInfo classInfoWithClass:cls];
+    YYClassInfo *classInfo = [YYClassInfo classInfoWithClass:cls]; // 利用cls初始化YYClassInfo对象
     if (!classInfo) return nil;
     self = [super init];
     
@@ -632,13 +632,13 @@ static force_inline id YYValueForMultiKeys(__unsafe_unretained NSDictionary *dic
     static dispatch_semaphore_t lock;
     dispatch_once(&onceToken, ^{
         cache = CFDictionaryCreateMutable(CFAllocatorGetDefault(), 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-        lock = dispatch_semaphore_create(1);
+        lock = dispatch_semaphore_create(1); // 加锁，同时只允许一条线程执行
     });
-    dispatch_semaphore_wait(lock, DISPATCH_TIME_FOREVER);
-    _YYModelMeta *meta = CFDictionaryGetValue(cache, (__bridge const void *)(cls));
-    dispatch_semaphore_signal(lock);
-    if (!meta || meta->_classInfo.needUpdate) {
-        meta = [[_YYModelMeta alloc] initWithClass:cls];
+    dispatch_semaphore_wait(lock, DISPATCH_TIME_FOREVER); // 当有一条线程进来后计数减一，计数变为0进入等待状态
+    _YYModelMeta *meta = CFDictionaryGetValue(cache, (__bridge const void *)(cls)); // cls作为key从缓存中获取对应的value
+    dispatch_semaphore_signal(lock); // 信号量计数加1，后续线程可以执行锁中的代码
+    if (!meta || meta->_classInfo.needUpdate) { // 如果缓存中没有与cls对应的meta对象或者mata需要更新class类信息
+        meta = [[_YYModelMeta alloc] initWithClass:cls]; // 利用cls初始化meta对象
         if (meta) {
             dispatch_semaphore_wait(lock, DISPATCH_TIME_FOREVER);
             CFDictionarySetValue(cache, (__bridge const void *)(cls), (__bridge const void *)(meta));
@@ -1432,17 +1432,17 @@ static NSString *ModelDescription(NSObject *model) {
 @implementation NSObject (YYModel)
 
 + (NSDictionary *)_yy_dictionaryWithJSON:(id)json {
-    if (!json || json == (id)kCFNull) return nil;
+    if (!json || json == (id)kCFNull) return nil; // 判断json是不是为nil和<null>
     NSDictionary *dic = nil;
     NSData *jsonData = nil;
-    if ([json isKindOfClass:[NSDictionary class]]) {
+    if ([json isKindOfClass:[NSDictionary class]]) { // 如果已经dictionary直接返回
         dic = json;
-    } else if ([json isKindOfClass:[NSString class]]) {
-        jsonData = [(NSString *)json dataUsingEncoding : NSUTF8StringEncoding];
+    } else if ([json isKindOfClass:[NSString class]]) { // 如果是string类型
+        jsonData = [(NSString *)json dataUsingEncoding : NSUTF8StringEncoding]; // 将string转出data
     } else if ([json isKindOfClass:[NSData class]]) {
         jsonData = json;
     }
-    if (jsonData) {
+    if (jsonData) { // 如果data存在将data转换成string
         dic = [NSJSONSerialization JSONObjectWithData:jsonData options:kNilOptions error:NULL];
         if (![dic isKindOfClass:[NSDictionary class]]) dic = nil;
     }
@@ -1450,16 +1450,17 @@ static NSString *ModelDescription(NSObject *model) {
 }
 
 + (instancetype)modelWithJSON:(id)json {
+    // 将json转化成OC的字典
     NSDictionary *dic = [self _yy_dictionaryWithJSON:json];
     return [self modelWithDictionary:dic];
 }
 
 + (instancetype)modelWithDictionary:(NSDictionary *)dictionary {
-    if (!dictionary || dictionary == (id)kCFNull) return nil;
-    if (![dictionary isKindOfClass:[NSDictionary class]]) return nil;
+    if (!dictionary || dictionary == (id)kCFNull) return nil; // 如果dictionary为nil和<null>,返回nil
+    if (![dictionary isKindOfClass:[NSDictionary class]]) return nil; // 不是dictionary返回nil
     
     Class cls = [self class];
-    _YYModelMeta *modelMeta = [_YYModelMeta metaWithClass:cls];
+    _YYModelMeta *modelMeta = [_YYModelMeta metaWithClass:cls]; // 根据模型的class初始化_YYModelMeta对象
     if (modelMeta->_hasCustomClassFromDictionary) {
         cls = [cls modelCustomClassForDictionary:dictionary] ?: cls;
     }
